@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TRADR — 모의 주식 투자</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Bebas+Neue&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #080c10;
+    --surface:  #0d1420;
+    --border:   #1a2535;
+    --muted:    #2a3a52;
+    --dim:      #4a6080;
+    --text:     #c8d8e8;
+    --bright:   #e8f4ff;
+    --accent:   #00d4aa;
+    --gain:     #00e676;
+    --loss:     #ff3d5a;
+    --warn:     #ffb700;
+    --chart:    #1565c0;
+    --mono:     'Space Mono', monospace;
+    --sans:     'IBM Plex Sans', sans-serif;
+    --display:  'Bebas Neue', cursive;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── TICKER TAPE ── */
+  .ticker-wrap {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    overflow: hidden;
+    height: 32px;
+    display: flex;
+    align-items: center;
+  }
+  .ticker-inner {
+    display: flex;
+    gap: 0;
+    animation: ticker 60s linear infinite;
+    white-space: nowrap;
+  }
+  .ticker-item {
+    padding: 0 24px;
+    font-family: var(--mono);
+    font-size: 11px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .ticker-item .sym { color: var(--bright); font-weight: 700; }
+  .ticker-item .price { color: var(--text); }
+  .ticker-item .chg.up { color: var(--gain); }
+  .ticker-item .chg.dn { color: var(--loss); }
+  @keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .logo {
+    font-family: var(--display);
+    font-size: 28px;
+    letter-spacing: 4px;
+    color: var(--accent);
+  }
+  .logo span { color: var(--dim); font-size: 12px; font-family: var(--mono); letter-spacing: 2px; }
+  .header-right { display: flex; align-items: center; gap: 24px; }
+  .clock { font-family: var(--mono); font-size: 12px; color: var(--dim); }
+  .market-status {
+    display: flex; align-items: center; gap: 6px;
+    font-family: var(--mono); font-size: 11px; color: var(--gain);
+  }
+  .market-status::before {
+    content: ''; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--gain); box-shadow: 0 0 6px var(--gain);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+
+  /* ── LAYOUT ── */
+  .app { display: grid; grid-template-columns: 1fr 340px; grid-template-rows: auto 1fr; height: calc(100vh - 97px); }
+
+  /* ── LEFT PANEL ── */
+  .left-panel { display: flex; flex-direction: column; border-right: 1px solid var(--border); overflow: hidden; }
+
+  /* ── PORTFOLIO BAR ── */
+  .portfolio-bar {
+    background: linear-gradient(135deg, #0d1a2d 0%, #0a1520 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex; gap: 32px; align-items: center;
+  }
+  .port-stat { display: flex; flex-direction: column; gap: 2px; }
+  .port-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--dim); }
+  .port-value { font-family: var(--mono); font-size: 20px; color: var(--bright); font-weight: 700; }
+  .port-value.up { color: var(--gain); }
+  .port-value.dn { color: var(--loss); }
+  .port-sub { font-family: var(--mono); font-size: 11px; }
+  .port-sub.up { color: var(--gain); }
+  .port-sub.dn { color: var(--loss); }
+  .sep { width: 1px; height: 40px; background: var(--border); }
+
+  /* ── TABS ── */
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .tab {
+    padding: 10px 20px;
+    font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--dim); cursor: pointer; border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    font-family: var(--mono);
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ── PANELS ── */
+  .panel { display: none; flex: 1; overflow-y: auto; }
+  .panel.active { display: flex; flex-direction: column; }
+  .panel::-webkit-scrollbar { width: 4px; }
+  .panel::-webkit-scrollbar-track { background: var(--bg); }
+  .panel::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 2px; }
+
+  /* ── STOCK TABLE ── */
+  .stock-table { width: 100%; border-collapse: collapse; }
+  .stock-table thead th {
+    padding: 10px 16px;
+    text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--dim); font-family: var(--mono); font-weight: 400;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; background: var(--bg); z-index: 1;
+  }
+  .stock-table thead th:not(:first-child) { text-align: right; }
+  .stock-table tbody tr {
+    border-bottom: 1px solid rgba(26,37,53,0.5);
+    cursor: pointer; transition: background 0.15s;
+  }
+  .stock-table tbody tr:hover { background: rgba(13,20,32,0.8); }
+  .stock-table tbody tr.selected { background: rgba(0,212,170,0.05); }
+  .stock-table td { padding: 12px 16px; }
+  .stock-table td:not(:first-child) { text-align: right; font-family: var(--mono); }
+
+  .stock-name { display: flex; flex-direction: column; gap: 2px; }
+  .stock-sym { font-family: var(--mono); font-weight: 700; font-size: 13px; color: var(--bright); }
+  .stock-full { font-size: 11px; color: var(--dim); }
+  .stock-price { font-size: 14px; font-weight: 700; color: var(--bright); }
+  .badge {
+    display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 10px;
+    font-family: var(--mono); font-weight: 700;
+  }
+  .badge.up { background: rgba(0,230,118,0.12); color: var(--gain); }
+  .badge.dn { background: rgba(255,61,90,0.12); color: var(--loss); }
+
+  .sparkline { display: flex; align-items: flex-end; gap: 2px; height: 24px; justify-content: flex-end; }
+  .sparkline span {
+    width: 3px; background: var(--muted); border-radius: 1px;
+    transition: height 0.3s ease;
+  }
+  .sparkline.up span { background: rgba(0,230,118,0.5); }
+  .sparkline.dn span { background: rgba(255,61,90,0.5); }
+
+  /* ── MINI CHART ── */
+  .chart-panel { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .chart-header { display: flex; justify-content: space-between; align-items: flex-start; }
+  .chart-name { font-family: var(--display); font-size: 22px; letter-spacing: 2px; color: var(--bright); }
+  .chart-price-block { text-align: right; }
+  .chart-price { font-family: var(--mono); font-size: 24px; font-weight: 700; color: var(--bright); }
+  .chart-change { font-family: var(--mono); font-size: 12px; }
+  canvas#mainChart {
+    width: 100%; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+  .chart-timeframe { display: flex; gap: 4px; }
+  .tf-btn {
+    padding: 4px 10px; background: transparent; border: 1px solid var(--border);
+    color: var(--dim); font-family: var(--mono); font-size: 10px; border-radius: 3px;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .tf-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .tf-btn.active { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+  .no-stock-msg {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 8px; color: var(--dim);
+  }
+  .no-stock-msg .icon { font-size: 48px; opacity: 0.3; }
+  .no-stock-msg p { font-family: var(--mono); font-size: 12px; }
+
+  /* ── HOLDINGS ── */
+  .holdings-list { padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+  .holding-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px;
+  }
+  .holding-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .holding-sym { font-family: var(--mono); font-weight: 700; font-size: 15px; color: var(--bright); }
+  .holding-shares { font-family: var(--mono); font-size: 11px; color: var(--dim); }
+  .holding-vals { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 12px; }
+  .holding-pnl { font-weight: 700; }
+  .holding-bar { height: 2px; background: var(--border); border-radius: 1px; margin-top: 8px; overflow: hidden; }
+  .holding-bar-fill { height: 100%; border-radius: 1px; transition: width 0.5s ease; }
+  .empty-holdings {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 8px; color: var(--dim); padding: 40px;
+  }
+  .empty-holdings .icon { font-size: 48px; opacity: 0.3; }
+
+  /* ── HISTORY ── */
+  .history-list { padding: 0; }
+  .history-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 16px; border-bottom: 1px solid rgba(26,37,53,0.5);
+  }
+  .history-left { display: flex; flex-direction: column; gap: 3px; }
+  .history-action {
+    font-family: var(--mono); font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .history-action .buy { color: var(--gain); }
+  .history-action .sell { color: var(--loss); }
+  .history-time { font-size: 10px; color: var(--dim); }
+  .history-right { text-align: right; font-family: var(--mono); font-size: 12px; }
+  .history-total { color: var(--bright); font-weight: 700; }
+  .history-detail { font-size: 10px; color: var(--dim); }
+  .empty-history {
+    padding: 40px; text-align: center; color: var(--dim);
+    font-family: var(--mono); font-size: 12px;
+  }
+
+  /* ── RIGHT PANEL (TRADE) ── */
+  .right-panel {
+    display: flex; flex-direction: column;
+    background: var(--surface); overflow-y: auto;
+  }
+  .right-panel::-webkit-scrollbar { width: 4px; }
+  .right-panel::-webkit-scrollbar-thumb { background: var(--muted); }
+
+  .trade-header {
+    padding: 16px; border-bottom: 1px solid var(--border);
+    font-family: var(--mono); font-size: 10px; text-transform: uppercase;
+    letter-spacing: 2px; color: var(--dim);
+  }
+
+  .selected-stock-info {
+    padding: 16px; border-bottom: 1px solid var(--border);
+  }
+  .sel-sym { font-family: var(--display); font-size: 26px; letter-spacing: 3px; color: var(--bright); }
+  .sel-name { font-size: 11px; color: var(--dim); margin-top: 2px; }
+  .sel-price { font-family: var(--mono); font-size: 22px; font-weight: 700; margin-top: 8px; }
+  .sel-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .sel-stat { background: var(--bg); border-radius: 4px; padding: 8px; }
+  .sel-stat-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); }
+  .sel-stat-value { font-family: var(--mono); font-size: 12px; color: var(--text); margin-top: 2px; }
+
+  .trade-form { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+  .trade-toggle { display: flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+  .trade-btn {
+    flex: 1; padding: 10px; text-align: center; cursor: pointer;
+    font-family: var(--mono); font-size: 12px; font-weight: 700; transition: all 0.2s;
+    border: none; background: transparent; color: var(--dim);
+  }
+  .trade-btn.buy.active { background: rgba(0,230,118,0.15); color: var(--gain); }
+  .trade-btn.sell.active { background: rgba(255,61,90,0.15); color: var(--loss); }
+  .trade-btn:hover:not(.active) { background: var(--bg); color: var(--text); }
+
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--dim); font-family: var(--mono); }
+  .form-input {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+    padding: 10px 12px; color: var(--bright); font-family: var(--mono); font-size: 14px;
+    outline: none; transition: border-color 0.2s;
+    -moz-appearance: textfield;
+  }
+  .form-input::-webkit-outer-spin-button,
+  .form-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .form-input:focus { border-color: var(--accent); }
+  .form-input::placeholder { color: var(--muted); }
+
+  .qty-controls { display: flex; gap: 4px; margin-top: 4px; }
+  .qty-btn {
+    padding: 4px 10px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--dim); font-family: var(--mono); font-size: 10px; border-radius: 3px;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .qty-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .trade-summary {
+    background: var(--bg); border-radius: 4px; padding: 12px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .sum-row { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11px; }
+  .sum-row .sum-label { color: var(--dim); }
+  .sum-row .sum-val { color: var(--text); }
+  .sum-row.total { border-top: 1px solid var(--border); padding-top: 6px; margin-top: 2px; }
+  .sum-row.total .sum-val { color: var(--bright); font-weight: 700; font-size: 13px; }
+
+  .execute-btn {
+    width: 100%; padding: 14px; border: none; border-radius: 4px;
+    font-family: var(--mono); font-size: 13px; font-weight: 700; letter-spacing: 1px;
+    cursor: pointer; transition: all 0.2s; text-transform: uppercase;
+  }
+  .execute-btn.buy { background: var(--gain); color: var(--bg); }
+  .execute-btn.sell { background: var(--loss); color: var(--bright); }
+  .execute-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+  .execute-btn:active { transform: translateY(0); }
+  .execute-btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+  .no-select-prompt {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 8px; color: var(--dim); padding: 24px;
+    text-align: center;
+  }
+  .no-select-prompt .icon { font-size: 40px; opacity: 0.3; }
+  .no-select-prompt p { font-family: var(--mono); font-size: 11px; line-height: 1.6; }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 14px 18px;
+    font-family: var(--mono); font-size: 12px; color: var(--bright);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    transform: translateY(80px); opacity: 0; transition: all 0.3s ease;
+    z-index: 100; max-width: 280px;
+    border-left: 3px solid var(--accent);
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.error { border-left-color: var(--loss); }
+  .toast .toast-title { font-weight: 700; margin-bottom: 4px; }
+  .toast .toast-body { color: var(--dim); font-size: 11px; }
+
+  /* ── SCROLLBAR ── */
+  * { scrollbar-width: thin; scrollbar-color: var(--muted) transparent; }
+</style>
+</head>
+<body>
+
+<!-- TICKER -->
+<div class="ticker-wrap">
+  <div class="ticker-inner" id="tickerInner"></div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div>
+    <div class="logo">TRADR <span>// 모의투자 시뮬레이터</span></div>
+  </div>
+  <div class="header-right">
+    <div class="market-status">MARKET OPEN</div>
+    <div class="clock" id="clock">00:00:00</div>
+  </div>
+</header>
+
+<!-- MAIN APP -->
+<div class="app">
+  <!-- LEFT -->
+  <div class="left-panel">
+    <!-- PORTFOLIO BAR -->
+    <div class="portfolio-bar">
+      <div class="port-stat">
+        <div class="port-label">보유 현금</div>
+        <div class="port-value" id="cashDisplay">₩10,000,000</div>
+      </div>
+      <div class="sep"></div>
+      <div class="port-stat">
+        <div class="port-label">주식 평가액</div>
+        <div class="port-value" id="stockValueDisplay">₩0</div>
+      </div>
+      <div class="sep"></div>
+      <div class="port-stat">
+        <div class="port-label">총 자산</div>
+        <div class="port-value" id="totalValueDisplay">₩10,000,000</div>
+      </div>
+      <div class="sep"></div>
+      <div class="port-stat">
+        <div class="port-label">총 수익률</div>
+        <div class="port-value" id="returnDisplay">+0.00%</div>
+        <div class="port-sub" id="returnAbsDisplay">+₩0</div>
+      </div>
+    </div>
+
+    <!-- TABS -->
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('market')">시장</div>
+      <div class="tab" onclick="switchTab('chart')">차트</div>
+      <div class="tab" onclick="switchTab('holdings')">보유종목</div>
+      <div class="tab" onclick="switchTab('history')">거래내역</div>
+    </div>
+
+    <!-- MARKET PANEL -->
+    <div class="panel active" id="panel-market">
+      <table class="stock-table">
+        <thead>
+          <tr>
+            <th>종목</th>
+            <th>현재가</th>
+            <th>등락률</th>
+            <th>거래량</th>
+            <th>추세</th>
+          </tr>
+        </thead>
+        <tbody id="stockTableBody"></tbody>
+      </table>
+    </div>
+
+    <!-- CHART PANEL -->
+    <div class="panel" id="panel-chart">
+      <div id="chartContent">
+        <div class="no-stock-msg" style="height:100%;display:flex;">
+          <div class="icon">📈</div>
+          <p>종목을 선택하면<br>차트가 표시됩니다</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- HOLDINGS PANEL -->
+    <div class="panel" id="panel-holdings">
+      <div class="holdings-list" id="holdingsList">
+        <div class="empty-holdings">
+          <div class="icon">💼</div>
+          <p style="font-family:var(--mono);font-size:12px;color:var(--dim);">보유 종목이 없습니다</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- HISTORY PANEL -->
+    <div class="panel" id="panel-history">
+      <div class="history-list" id="historyList">
+        <div class="empty-history">거래 내역이 없습니다</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+    <div class="trade-header">// 주문 입력</div>
+
+    <div id="tradeContent">
+      <div class="no-select-prompt">
+        <div class="icon">←</div>
+        <p>좌측 시장 탭에서<br>종목을 클릭하면<br>매수/매도할 수 있습니다</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast">
+  <div class="toast-title" id="toastTitle"></div>
+  <div class="toast-body" id="toastBody"></div>
+</div>
+
+<script>
+// ─────────────────────────────────────────
+//  DATA
+// ─────────────────────────────────────────
+const INITIAL_CASH = 10_000_000;
+
+const STOCKS = [
+  { sym:'SSAM', name:'삼성전자',       price:74000,  vol:0.018, sector:'전자' },
+  { sym:'SKHX', name:'SK하이닉스',     price:178000, vol:0.025, sector:'반도체' },
+  { sym:'LGELC',name:'LG전자',         price:88000,  vol:0.020, sector:'전자' },
+  { sym:'KAAO', name:'카카오',          price:41000,  vol:0.030, sector:'IT' },
+  { sym:'NAVR', name:'네이버',          price:192000, vol:0.022, sector:'IT' },
+  { sym:'HYND', name:'현대자동차',      price:234000, vol:0.016, sector:'자동차' },
+  { sym:'CELZ', name:'셀트리온',        price:185000, vol:0.028, sector:'바이오' },
+  { sym:'POSM', name:'POSCO홀딩스',    price:320000, vol:0.015, sector:'철강' },
+  { sym:'KREDZ',name:'카카오뱅크',      price:23000,  vol:0.035, sector:'금융' },
+  { sym:'BTTM', name:'빗썸코리아',      price:9800,   vol:0.060, sector:'블록체인' },
+];
+
+let state = {
+  cash: INITIAL_CASH,
+  stocks: STOCKS.map(s => ({
+    ...s,
+    currentPrice: s.price,
+    prevPrice: s.price,
+    history: generateInitHistory(s.price, s.vol),
+    volume: Math.floor(Math.random() * 5_000_000 + 500_000),
+    dayOpen: s.price,
+  })),
+  holdings: {},      // { SYM: { shares, avgPrice } }
+  transactions: [],  // [ { type, sym, shares, price, total, time } ]
+  selectedSym: null,
+  tradeMode: 'buy',
+  chartTf: '1D',
+};
+
+function generateInitHistory(basePrice, vol) {
+  const pts = 60;
+  const arr = [];
+  let p = basePrice * (0.85 + Math.random() * 0.15);
+  for (let i = 0; i < pts; i++) {
+    p *= 1 + (Math.random() - 0.5) * vol * 2;
+    p = Math.max(p, basePrice * 0.5);
+    arr.push(Math.round(p));
+  }
+  arr.push(basePrice);
+  return arr;
+}
+
+// ─────────────────────────────────────────
+//  HELPERS
+// ─────────────────────────────────────────
+const fmt = n => '₩' + Math.round(n).toLocaleString('ko-KR');
+const fmtShort = n => n >= 1e8 ? (n/1e8).toFixed(1)+'억' : n >= 1e4 ? (n/1e4).toFixed(0)+'만' : n.toLocaleString();
+const pct = (a,b) => ((a-b)/b*100).toFixed(2);
+const sign = n => n >= 0 ? '+' : '';
+
+function getStock(sym) { return state.stocks.find(s => s.sym === sym); }
+function getHolding(sym) { return state.holdings[sym] || null; }
+function totalStockValue() {
+  return Object.entries(state.holdings).reduce((acc,[sym,h]) => {
+    const s = getStock(sym);
+    return acc + (s ? s.currentPrice * h.shares : 0);
+  }, 0);
+}
+
+// ─────────────────────────────────────────
+//  PRICE ENGINE
+// ─────────────────────────────────────────
+function tick() {
+  state.stocks.forEach(s => {
+    s.prevPrice = s.currentPrice;
+    const drift = (Math.random() - 0.49) * s.vol;
+    s.currentPrice = Math.max(100, Math.round(s.currentPrice * (1 + drift)));
+    s.history.push(s.currentPrice);
+    if (s.history.length > 200) s.history.shift();
+    s.volume += Math.floor(Math.random() * 50_000);
+  });
+  render();
+}
+
+// ─────────────────────────────────────────
+//  RENDER
+// ─────────────────────────────────────────
+function render() {
+  renderTicker();
+  renderPortfolioBar();
+  renderStockTable();
+  if (state.selectedSym) {
+    renderTradePanel();
+    renderChartPanel();
+  }
+  renderHoldings();
+}
+
+function renderTicker() {
+  const inner = document.getElementById('tickerInner');
+  // build two copies for seamless loop
+  let html = '';
+  for (let copy = 0; copy < 2; copy++) {
+    state.stocks.forEach(s => {
+      const chg = parseFloat(pct(s.currentPrice, s.dayOpen));
+      const cls = chg >= 0 ? 'up' : 'dn';
+      const arrow = chg >= 0 ? '▲' : '▼';
+      html += `<div class="ticker-item">
+        <span class="sym">${s.sym}</span>
+        <span class="price">${s.currentPrice.toLocaleString()}</span>
+        <span class="chg ${cls}">${arrow}${Math.abs(chg).toFixed(2)}%</span>
+      </div>`;
+    });
+  }
+  inner.innerHTML = html;
+}
+
+function renderPortfolioBar() {
+  const sv = totalStockValue();
+  const total = state.cash + sv;
+  const ret = ((total - INITIAL_CASH) / INITIAL_CASH * 100);
+  const diff = total - INITIAL_CASH;
+
+  document.getElementById('cashDisplay').textContent = fmt(state.cash);
+  document.getElementById('stockValueDisplay').textContent = fmt(sv);
+  document.getElementById('totalValueDisplay').textContent = fmt(total);
+
+  const retEl = document.getElementById('returnDisplay');
+  const retAbsEl = document.getElementById('returnAbsDisplay');
+  retEl.textContent = sign(ret) + ret.toFixed(2) + '%';
+  retEl.className = 'port-value ' + (ret >= 0 ? 'up' : 'dn');
+  retAbsEl.textContent = sign(diff) + fmt(diff);
+  retAbsEl.className = 'port-sub ' + (diff >= 0 ? 'up' : 'dn');
+}
+
+function renderStockTable() {
+  const tbody = document.getElementById('stockTableBody');
+  tbody.innerHTML = state.stocks.map(s => {
+    const chgDay = parseFloat(pct(s.currentPrice, s.dayOpen));
+    const chgTick = parseFloat(pct(s.currentPrice, s.prevPrice));
+    const cls = chgDay >= 0 ? 'up' : 'dn';
+    const isSelected = s.sym === state.selectedSym;
+
+    // sparkline: last 10 history points
+    const pts = s.history.slice(-10);
+    const mn = Math.min(...pts), mx = Math.max(...pts);
+    const bars = pts.map(v => {
+      const h = mx === mn ? 50 : Math.round(((v - mn) / (mx - mn)) * 80 + 8);
+      return `<span style="height:${h}%"></span>`;
+    }).join('');
+
+    const flash = chgTick > 0 ? 'color:var(--gain)' : chgTick < 0 ? 'color:var(--loss)' : '';
+
+    return `<tr onclick="selectStock('${s.sym}')" class="${isSelected?'selected':''}">
+      <td>
+        <div class="stock-name">
+          <span class="stock-sym">${s.sym}</span>
+          <span class="stock-full">${s.name}</span>
+        </div>
+      </td>
+      <td><span class="stock-price" style="${flash}">${s.currentPrice.toLocaleString()}</span></td>
+      <td><span class="badge ${cls}">${sign(chgDay)}${chgDay.toFixed(2)}%</span></td>
+      <td style="color:var(--dim);font-size:11px">${fmtShort(s.volume)}</td>
+      <td><div class="sparkline ${cls}">${bars}</div></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderTradePanel() {
+  if (!state.selectedSym) return;
+  const s = getStock(state.selectedSym);
+  const h = getHolding(state.selectedSym);
+  const chg = parseFloat(pct(s.currentPrice, s.dayOpen));
+  const chgCls = chg >= 0 ? 'gain' : 'loss';
+  const chgColor = chg >= 0 ? 'var(--gain)' : 'var(--loss)';
+
+  const qtyVal = document.getElementById('qtyInput')?.value || 1;
+  const total = s.currentPrice * parseInt(qtyVal || 0);
+  const mode = state.tradeMode;
+
+  document.getElementById('tradeContent').innerHTML = `
+    <div class="selected-stock-info">
+      <div class="sel-sym">${s.sym}</div>
+      <div class="sel-name">${s.name} · ${s.sector}</div>
+      <div class="sel-price" style="color:${chgColor}">${s.currentPrice.toLocaleString()}원</div>
+      <div class="sel-stats">
+        <div class="sel-stat">
+          <div class="sel-stat-label">등락률</div>
+          <div class="sel-stat-value" style="color:${chgColor}">${sign(chg)}${chg.toFixed(2)}%</div>
+        </div>
+        <div class="sel-stat">
+          <div class="sel-stat-label">시가</div>
+          <div class="sel-stat-value">${s.dayOpen.toLocaleString()}</div>
+        </div>
+        <div class="sel-stat">
+          <div class="sel-stat-label">보유수량</div>
+          <div class="sel-stat-value">${h ? h.shares+'주' : '-'}</div>
+        </div>
+        <div class="sel-stat">
+          <div class="sel-stat-label">평균단가</div>
+          <div class="sel-stat-value">${h ? h.avgPrice.toLocaleString() : '-'}</div>
+        </div>
+      </div>
+    </div>
+    <div class="trade-form">
+      <div class="trade-toggle">
+        <button class="trade-btn buy ${mode==='buy'?'active':''}" onclick="setMode('buy')">매수</button>
+        <button class="trade-btn sell ${mode==='sell'?'active':''}" onclick="setMode('sell')">매도</button>
+      </div>
+      <div class="form-group">
+        <label class="form-label">수량 (주)</label>
+        <input class="form-input" type="number" id="qtyInput" value="1" min="1" oninput="updateSummary()">
+        <div class="qty-controls">
+          <button class="qty-btn" onclick="setQty(1)">1</button>
+          <button class="qty-btn" onclick="setQty(5)">5</button>
+          <button class="qty-btn" onclick="setQty(10)">10</button>
+          <button class="qty-btn" onclick="setQtyMax()">MAX</button>
+        </div>
+      </div>
+      <div class="trade-summary" id="tradeSummary">
+        <div class="sum-row"><span class="sum-label">현재가</span><span class="sum-val">${s.currentPrice.toLocaleString()}원</span></div>
+        <div class="sum-row"><span class="sum-label">수량</span><span class="sum-val" id="sumQty">1주</span></div>
+        <div class="sum-row total"><span class="sum-label">총액</span><span class="sum-val" id="sumTotal">${fmt(s.currentPrice)}</span></div>
+      </div>
+      <button class="execute-btn ${mode}" id="executeBtn" onclick="executeTrade()">
+        ${mode === 'buy' ? '매수 체결' : '매도 체결'}
+      </button>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--dim);text-align:center;">
+        ${mode==='buy' ? '가용현금: '+fmt(state.cash) : '보유수량: '+(h?h.shares:0)+'주'}
+      </div>
+    </div>
+  `;
+}
+
+function renderChartPanel() {
+  if (!state.selectedSym) return;
+  const s = getStock(state.selectedSym);
+  const chg = parseFloat(pct(s.currentPrice, s.dayOpen));
+  const chgColor = chg >= 0 ? 'var(--gain)' : 'var(--loss)';
+
+  document.getElementById('chartContent').innerHTML = `
+    <div class="chart-panel">
+      <div class="chart-header">
+        <div>
+          <div class="chart-name">${s.sym}</div>
+          <div style="font-size:11px;color:var(--dim)">${s.name}</div>
+        </div>
+        <div class="chart-price-block">
+          <div class="chart-price" style="color:${chgColor}">${s.currentPrice.toLocaleString()}</div>
+          <div class="chart-change" style="color:${chgColor}">${sign(chg)}${chg.toFixed(2)}%</div>
+        </div>
+      </div>
+      <div class="chart-timeframe">
+        ${['1D','5D','1M','3M'].map(tf =>
+          `<button class="tf-btn ${state.chartTf===tf?'active':''}" onclick="setTf('${tf}')">${tf}</button>`
+        ).join('')}
+      </div>
+      <canvas id="mainChart" height="180"></canvas>
+    </div>
+  `;
+  drawChart();
+}
+
+function drawChart() {
+  const canvas = document.getElementById('mainChart');
+  if (!canvas) return;
+  const s = getStock(state.selectedSym);
+  if (!s) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.parentElement.clientWidth - 32;
+  const H = 180;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  let pts;
+  if (state.chartTf === '1D') pts = s.history.slice(-60);
+  else if (state.chartTf === '5D') pts = s.history.slice(-100);
+  else if (state.chartTf === '1M') pts = s.history;
+  else pts = s.history;
+
+  const mn = Math.min(...pts), mx = Math.max(...pts);
+  const pad = { t:10, r:8, b:24, l:8 };
+  const cw = W - pad.l - pad.r, ch = H - pad.t - pad.b;
+
+  const xp = i => pad.l + (i / (pts.length-1)) * cw;
+  const yp = v => pad.t + ch - ((v - mn) / (mx - mn || 1)) * ch;
+
+  const isUp = pts[pts.length-1] >= pts[0];
+  const lineColor = isUp ? '#00e676' : '#ff3d5a';
+  const fillColor = isUp ? 'rgba(0,230,118,0.08)' : 'rgba(255,61,90,0.08)';
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(26,37,53,0.6)';
+  ctx.lineWidth = 1;
+  [0.25,0.5,0.75].forEach(f => {
+    const y = pad.t + ch * f;
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l+cw, y);
+    ctx.stroke();
+    // price label
+    const lv = mx - (mx-mn)*f;
+    ctx.fillStyle = 'rgba(74,96,128,0.8)';
+    ctx.font = '9px Space Mono, monospace';
+    ctx.fillText(Math.round(lv).toLocaleString(), pad.l+2, y-3);
+  });
+
+  // Fill
+  ctx.beginPath();
+  ctx.moveTo(xp(0), yp(pts[0]));
+  pts.forEach((v,i) => ctx.lineTo(xp(i), yp(v)));
+  ctx.lineTo(xp(pts.length-1), pad.t+ch);
+  ctx.lineTo(xp(0), pad.t+ch);
+  ctx.closePath();
+  ctx.fillStyle = fillColor;
+  ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  ctx.moveTo(xp(0), yp(pts[0]));
+  pts.forEach((v,i) => ctx.lineTo(xp(i), yp(v)));
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = 1.5;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+
+  // Current price dot
+  const lx = xp(pts.length-1), ly = yp(pts[pts.length-1]);
+  ctx.beginPath();
+  ctx.arc(lx, ly, 4, 0, Math.PI*2);
+  ctx.fillStyle = lineColor;
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(lx, ly, 3, 0, Math.PI*2);
+  ctx.fillStyle = 'var(--bg)';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(lx, ly, 2, 0, Math.PI*2);
+  ctx.fillStyle = lineColor;
+  ctx.fill();
+}
+
+function renderHoldings() {
+  const el = document.getElementById('holdingsList');
+  const entries = Object.entries(state.holdings).filter(([,h]) => h.shares > 0);
+  if (entries.length === 0) {
+    el.innerHTML = `<div class="empty-holdings"><div class="icon">💼</div><p style="font-family:var(--mono);font-size:12px;color:var(--dim);">보유 종목이 없습니다</p></div>`;
+    return;
+  }
+  el.innerHTML = entries.map(([sym,h]) => {
+    const s = getStock(sym);
+    const cv = s.currentPrice * h.shares;
+    const cost = h.avgPrice * h.shares;
+    const pnl = cv - cost;
+    const pnlPct = ((s.currentPrice - h.avgPrice) / h.avgPrice * 100).toFixed(2);
+    const isUp = pnl >= 0;
+    const barW = Math.min(100, Math.abs(parseFloat(pnlPct)) * 5);
+    return `<div class="holding-card">
+      <div class="holding-top">
+        <span class="holding-sym">${sym}</span>
+        <span class="holding-shares">${h.shares}주 보유</span>
+      </div>
+      <div class="holding-vals">
+        <span style="color:var(--dim)">평단 ${h.avgPrice.toLocaleString()}원</span>
+        <span style="color:${isUp?'var(--gain)':'var(--loss)'}">
+          현재 ${fmt(cv)}
+        </span>
+      </div>
+      <div class="holding-vals" style="margin-top:4px">
+        <span style="color:var(--dim)">투자금 ${fmt(cost)}</span>
+        <span class="holding-pnl" style="color:${isUp?'var(--gain)':'var(--loss)'}">
+          ${sign(pnl)}${fmt(pnl)} (${sign(pnlPct)}${pnlPct}%)
+        </span>
+      </div>
+      <div class="holding-bar">
+        <div class="holding-bar-fill" style="width:${barW}%;background:${isUp?'var(--gain)':'var(--loss)'}"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderHistory() {
+  const el = document.getElementById('historyList');
+  if (state.transactions.length === 0) {
+    el.innerHTML = `<div class="empty-history">거래 내역이 없습니다</div>`;
+    return;
+  }
+  el.innerHTML = [...state.transactions].reverse().map(t => {
+    const s = getStock(t.sym);
+    return `<div class="history-item">
+      <div class="history-left">
+        <div class="history-action">
+          <span class="${t.type}">${t.type === 'buy' ? '매수' : '매도'}</span>
+          <span style="color:var(--bright);font-weight:700">${t.sym}</span>
+          <span style="color:var(--dim)">${s?.name}</span>
+        </div>
+        <div class="history-time">${t.time}</div>
+      </div>
+      <div class="history-right">
+        <div class="history-total">${fmt(t.total)}</div>
+        <div class="history-detail">${t.shares}주 × ${t.price.toLocaleString()}원</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ─────────────────────────────────────────
+//  INTERACTIONS
+// ─────────────────────────────────────────
+function selectStock(sym) {
+  state.selectedSym = sym;
+  state.tradeMode = 'buy';
+  renderStockTable();
+  renderTradePanel();
+  renderChartPanel();
+}
+
+function setMode(mode) {
+  state.tradeMode = mode;
+  renderTradePanel();
+}
+
+function setQty(n) {
+  const inp = document.getElementById('qtyInput');
+  if (inp) { inp.value = n; updateSummary(); }
+}
+
+function setQtyMax() {
+  if (!state.selectedSym) return;
+  const s = getStock(state.selectedSym);
+  if (state.tradeMode === 'buy') {
+    const max = Math.floor(state.cash / s.currentPrice);
+    setQty(Math.max(1, max));
+  } else {
+    const h = getHolding(state.selectedSym);
+    setQty(h ? h.shares : 1);
+  }
+}
+
+function updateSummary() {
+  if (!state.selectedSym) return;
+  const s = getStock(state.selectedSym);
+  const qty = parseInt(document.getElementById('qtyInput')?.value || 0);
+  const total = s.currentPrice * (qty || 0);
+  const sumQ = document.getElementById('sumQty');
+  const sumT = document.getElementById('sumTotal');
+  if (sumQ) sumQ.textContent = (qty || 0) + '주';
+  if (sumT) sumT.textContent = fmt(total);
+}
+
+function executeTrade() {
+  if (!state.selectedSym) return;
+  const s = getStock(state.selectedSym);
+  const qty = parseInt(document.getElementById('qtyInput')?.value || 0);
+  if (!qty || qty <= 0) { showToast('오류', '수량을 입력하세요', true); return; }
+
+  const total = s.currentPrice * qty;
+  const now = new Date().toLocaleTimeString('ko-KR');
+
+  if (state.tradeMode === 'buy') {
+    if (total > state.cash) { showToast('매수 실패', '현금이 부족합니다', true); return; }
+    state.cash -= total;
+    if (!state.holdings[s.sym]) state.holdings[s.sym] = { shares:0, avgPrice:0 };
+    const h = state.holdings[s.sym];
+    const prevTotal = h.avgPrice * h.shares;
+    h.shares += qty;
+    h.avgPrice = Math.round((prevTotal + total) / h.shares);
+    state.transactions.push({ type:'buy', sym:s.sym, shares:qty, price:s.currentPrice, total, time:now });
+    showToast('매수 체결 ✓', `${s.name} ${qty}주 @ ${s.currentPrice.toLocaleString()}원`);
+  } else {
+    const h = getHolding(s.sym);
+    if (!h || h.shares < qty) { showToast('매도 실패', '보유 수량이 부족합니다', true); return; }
+    state.cash += total;
+    h.shares -= qty;
+    if (h.shares === 0) delete state.holdings[s.sym];
+    state.transactions.push({ type:'sell', sym:s.sym, shares:qty, price:s.currentPrice, total, time:now });
+    showToast('매도 체결 ✓', `${s.name} ${qty}주 @ ${s.currentPrice.toLocaleString()}원`);
+  }
+
+  renderHistory();
+  render();
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    const tabs = ['market','chart','holdings','history'];
+    t.classList.toggle('active', tabs[i] === tab);
+  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  const panel = document.getElementById('panel-'+tab);
+  if (panel) panel.classList.add('active');
+  if (tab === 'chart') renderChartPanel();
+  if (tab === 'history') renderHistory();
+  if (tab === 'holdings') renderHoldings();
+}
+
+function setTf(tf) {
+  state.chartTf = tf;
+  renderChartPanel();
+}
+
+// ─────────────────────────────────────────
+//  TOAST
+// ─────────────────────────────────────────
+let toastTimer = null;
+function showToast(title, body, isError=false) {
+  const t = document.getElementById('toast');
+  document.getElementById('toastTitle').textContent = title;
+  document.getElementById('toastBody').textContent = body;
+  t.className = 'toast show' + (isError ? ' error' : '');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.classList.remove('show'); }, 3000);
+}
+
+// ─────────────────────────────────────────
+//  CLOCK
+// ─────────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toLocaleTimeString('ko-KR', {hour12:false});
+}
+
+// ─────────────────────────────────────────
+//  INIT
+// ─────────────────────────────────────────
+render();
+updateClock();
+setInterval(tick, 2000);
+setInterval(updateClock, 1000);
+window.addEventListener('resize', () => { if (state.selectedSym) drawChart(); });
+</script>
+</body>
+</html>
